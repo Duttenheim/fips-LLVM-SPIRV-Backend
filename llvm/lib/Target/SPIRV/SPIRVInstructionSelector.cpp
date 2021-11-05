@@ -599,13 +599,13 @@ static void addMemoryOperands(MachineMemOperand *MemOp, MachineInstrBuilder &MIB
     spvMemOp |= MemoryOperand::Volatile;
   if (MemOp->isNonTemporal())
     spvMemOp |= MemoryOperand::Nontemporal;
-  if (MemOp->getAlignment())
+  if (MemOp->getAlign().value())
     spvMemOp |= MemoryOperand::Aligned;
 
   if (spvMemOp != MemoryOperand::None) {
     MIB.addImm(spvMemOp);
     if (spvMemOp & MemoryOperand::Aligned)
-      MIB.addImm(MemOp->getAlignment());
+      MIB.addImm(MemOp->getAlign().value());
   }
 }
 
@@ -1042,13 +1042,18 @@ SPIRVInstructionSelector::buildI32Constant(uint32_t val,
   auto spvI32Ty = TR.getOrCreateSPIRVType(
       LLVMTy,
       MIRBuilder);
-  Register newReg = MRI->createGenericVirtualRegister(LLT::scalar(32));
-  DT.add(ConstantInt::get(LLVMTy, val), &MIRBuilder.getMF(), newReg);
-  auto MIB = MIRBuilder.buildInstr(SPIRV::OpConstantI)
+  // Find a constant in DT or build a new one.
+  auto ConstInt = ConstantInt::get(LLVMTy, val);
+  Register newReg;
+  if (DT.find(ConstInt, &MIRBuilder.getMF(), newReg) == false) {
+    newReg = MRI->createGenericVirtualRegister(LLT::scalar(32));
+    DT.add(ConstInt, &MIRBuilder.getMF(), newReg);
+    auto MIB = MIRBuilder.buildInstr(SPIRV::OpConstantI)
                  .addDef(newReg)
                  .addUse(TR.getSPIRVTypeID(spvI32Ty))
                  .addImm(APInt(32, val).getZExtValue());
-  constrainSelectedInstRegOperands(*MIB, TII, TRI, RBI);
+    constrainSelectedInstRegOperands(*MIB, TII, TRI, RBI);
+  }
   return newReg;
 }
 
