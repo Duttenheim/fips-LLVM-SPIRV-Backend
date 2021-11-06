@@ -1,0 +1,11 @@
+#
+# fips-llvm-spirv
+#
+---
+exports:
+    header-dirs: 
+        - llvm/include
+        - mlir/include
+    modules:
+        llvm: .
+
